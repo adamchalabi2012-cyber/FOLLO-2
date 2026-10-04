@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<title>FOLLO</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#0A0D14;color:#F6F4F2;overflow:hidden;position:fixed;width:100%;height:100%}
+#root{width:100%;height:100%;overflow:hidden}
+.app-container{width:100%;height:100vh;height:100dvh;max-width:480px;margin:0 auto;position:relative;background:radial-gradient(circle at 50% 0%,#16233A 0%,#0A0D14 60%);display:flex;flex-direction:column;overflow:hidden}
+.lang-select{background:#121620;border:1px solid #232838;color:#F6F4F2;padding:10px 14px;border-radius:12px;font-size:14px;cursor:pointer;outline:none;width:100%}
+.input-field{width:100%;background:#121620;border:1px solid #232838;border-radius:12px;padding:14px;color:#F6F4F2;font-size:14px;outline:none;transition:border-color .2s;box-sizing:border-box}
+.input-field:focus{border-color:#00E5A0}
+.input-field::placeholder{color:#6E6A78}
+.overlay{position:fixed;inset:0;background:rgba(10,13,20,0.97);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;overflow-y:auto}
+@keyframes follo-ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#232838;border-radius:2px}
+button,input,textarea,select{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback, StrictMode } = React;
+
+// شعار FOLLO — استبدل القيمة التالية بصورة اللوغو الحقيقية (data:image/png;base64,...) أو برابط ملف الصورة مثل "logo.png"
+const FOLLO_LOGO = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230A0D14'/><text x='50' y='72' font-size='70' font-weight='bold' text-anchor='middle' fill='%2338b6ff' font-family='Arial'>F</text></svg>";
+
+
+// ===== icons.jsx =====
+const mk = g => ({ size=16, color, style={} }) => <span style={{ fontSize:size, lineHeight:1, color, display:"inline-flex", ...style }}>{g}</span>;
+const Mail=mk("✉️"); const Lock=mk("🔒"); const ShieldCheck=mk("🛡️");
+const Instagram=mk("📷"); const Coins=mk("🪙"); const TrendingUp=mk("📈");
+const Flag=mk("🚩"); const User=mk("👤"); const LogOut=mk("🚪");
+const Camera=mk("📸"); const Plus=mk("➕"); const Check=mk("✓");
+const X=mk("✕"); const Zap=mk("⚡"); const Star=mk("⭐");
+const Crown=mk("👑"); const Wifi=mk("📶"); const WifiOff=mk("📴");
+const Users=mk("👥"); const Settings=mk("⚙️"); const AlertTriangle=mk("⚠️");
+const Gift=mk("🎁"); const Sparkles=mk("✨"); const Eye=mk("👁️");
+const EyeOff=mk("🙈"); const Trash2=mk("🗑️"); const Search=mk("🔍");
+const Info=mk("ℹ️");
+
+
+// ===== helpers.jsx =====
+const SPEED_META = { normal:{cost:1200,bolts:1}, fast:{cost:2400,bolts:2}, ultra:{cost:3600,bolts:3} };
+
+const AVATAR_PRESETS = [
+  {emoji:"🦁",grad:["#FF6B6B","#FFD93D"]},{emoji:"🐺",grad:["#4B6CB7","#182848"]},{emoji:"🦊",grad:["#F7971E","#FFD200"]},
+  {emoji:"🐼",grad:["#0F2027","#2C5364"]},{emoji:"🦄",grad:["#C33764","#1D2671"]},{emoji:"🐯",grad:["#F857A6","#FF5858"]},
+  {emoji:"🐸",grad:["#11998e","#38ef7d"]},{emoji:"🦝",grad:["#3A1C71","#D76D77"]},{emoji:"🐻",grad:["#8E2DE2","#4A00E0"]},
+  {emoji:"🐵",grad:["#ff9966","#ff5e62"]},{emoji:"🦉",grad:["#3E5151","#DECBA4"]},{emoji:"🦋",grad:["#4776E6","#8E54E9"]},
+  {emoji:"🐬",grad:["#00c6ff","#0072ff"]},{emoji:"🦈",grad:["#2C3E50","#4CA1AF"]},{emoji:"🦔",grad:["#AD5389","#3C1053"]},
+  {emoji:"🦖",grad:["#134E5E","#71B280"]},{emoji:"🐲",grad:["#614385","#516395"]},{emoji:"🦚",grad:["#00B4DB","#0083B0"]},
+  {emoji:"🐦",grad:["#ee0979","#ff6a00"]},{emoji:"🦜",grad:["#f12711","#f5af19"]},{emoji:"🐧",grad:["#373B44","#4286f4"]},
+  {emoji:"🦩",grad:["#FF416C","#FF4B2B"]},{emoji:"🐢",grad:["#56ab2f","#a8e063"]},{emoji:"🦀",grad:["#CB2D3E","#EF473A"]},
+  {emoji:"🐠",grad:["#2193b0","#6dd5ed"]},{emoji:"🐳",grad:["#0052D4","#6FB1FC"]},{emoji:"🦇",grad:["#606c88","#3f4c6b"]},
+  {emoji:"🐨",grad:["#bdc3c7","#2c3e50"]},{emoji:"🐘",grad:["#757F9A","#D7DDE8"]},{emoji:"🦒",grad:["#F09819","#EDDE5D"]},
+  {emoji:"🦘",grad:["#c0392b","#e74c3c"]},{emoji:"🐿️",grad:["#834d9b","#d04ed6"]},{emoji:"🐝",grad:["#F7971E","#FFD200"]},
+  {emoji:"🦂",grad:["#870000","#190A05"]},{emoji:"🐞",grad:["#ee0979","#ff6a00"]},{emoji:"🦗",grad:["#3a6186","#89253e"]},
+  {emoji:"🐍",grad:["#1D976C","#93F9B9"]},{emoji:"🦕",grad:["#52c234","#061700"]},{emoji:"🐉",grad:["#8A2387","#E94057"]},
+];
+
+const ADMIN_EMAIL = "adamchalabi2012@gmail.com";
+const ADMIN_PASSWORD = "adam_2012_7_8";
+const ADMIN_INSTAGRAM = "hac.gaming2012";
+
+function isValidInstagramHandle(h) {
+  if (!h) return false;
+  const s = h.replace(/^@/,"").trim();
+  return s.length>=1 && s.length<=30 && /^[a-zA-Z0-9._]+$/.test(s) && !s.startsWith(".") && !s.endsWith(".") && !s.includes("..");
+}
+function Screen({dir,children}){ return <div className="app-container" dir={dir}>{children}</div>; }
+function GradientButton({children,onClick,disabled,style,...rest}){
+  return <button onClick={onClick} disabled={disabled} style={{ background:disabled?"#33394A":"linear-gradient(135deg,#00E5A0,#7C5CFF)", color:"#15121A", fontWeight:700, border:"none", borderRadius:14, padding:"14px 20px", fontSize:15, opacity:disabled?0.6:1, cursor:disabled?"not-allowed":"pointer", boxShadow:disabled?"none":"0 8px 20px -8px rgba(0,229,160,0.55)", ...style }} {...rest}>{children}</button>;
+}
+function AvatarView({avatar,name,size=84,fontSize}){
+  if(avatar?.startsWith("preset:")){
+    const p=AVATAR_PRESETS[parseInt(avatar.split(":")[1],10)%AVATAR_PRESETS.length];
+    return <div style={{width:size,height:size,borderRadius:"50%",background:`linear-gradient(135deg,${p.grad[0]},${p.grad[1]})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:fontSize||size*0.5}}>{p.emoji}</div>;
+  }
+  if(avatar) return <div style={{width:size,height:size,borderRadius:"50%",background:`url(${avatar}) center/cover`}} ></div>;
+  return <div style={{width:size,height:size,borderRadius:"50%",overflow:"hidden",background:"#0A0D14"}}><img src={FOLLO_LOGO} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>;
+}
+function CoinPill({value,small}){
+  return <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,201,77,0.10)",border:"1px dashed rgba(255,201,77,0.45)",borderRadius:999,padding:small?"4px 10px":"8px 16px",fontFamily:"'JetBrains Mono',monospace"}}><Coins size={small?14:18} color="#FFCB4D"></Coins><span style={{color:"#FFCB4D",fontWeight:700,fontSize:small?13:16}}>{value}</span></div>;
+}
+function Bolts({n}){
+  return <div style={{display:"flex",gap:2}}>{[1,2,3].map(i=><Zap key={i} size={13} color={i<=n?"#7C5CFF":"#33394A"}></Zap>)}</div>;
+}
+function EmptyState({icon,text,sub}){
+  return <div style={{textAlign:"center",padding:"50px 20px",background:"#121620",border:"1px dashed #232838",borderRadius:16}}><div style={{display:"flex",justifyContent:"center",marginBottom:10}}>{icon}</div><div style={{fontWeight:600,fontSize:14,marginBottom:sub?6:0}}>{text}</div>{sub&&<div style={{color:"#6E6A78",fontSize:12,lineHeight:1.7}}>{sub}</div>}</div>;
+}
+function StatCard({label,value}){
+  return <div style={{flex:1,background:"#121620",border:"1px solid #232838",borderRadius:14,padding:14,textAlign:"center"}}><div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{value}</div><div style={{color:"#6E6A78",fontSize:11}}>{label}</div></div>;
+}
+function MenuRow({icon,label,onClick,danger}){
+  return <button onClick={onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"14px 4px",background:"none",border:"none",borderBottom:"1px solid #1A1F2C",color:danger?"#FF5C5C":"#F6F4F2",fontSize:14,fontWeight:600,cursor:"pointer",textAlign:"start"}}>{icon}{label}</button>;
+}
+function openInstagramProfile(handle){
+  const w=`https://instagram.com/${handle}`;
+  window.open(w,"_blank");
+}
+const loadUsersDB=()=>{try{return JSON.parse(localStorage.getItem("follo_users_db")||"{}")}catch{return{}}};
+const saveUsersDB=db=>{try{localStorage.setItem("follo_users_db",JSON.stringify(db))}catch{}};
+const loadCampaignsDB=()=>{try{return JSON.parse(localStorage.getItem("follo_campaigns_db")||"[]")}catch{return[]}};
+const saveCampaignsDB=l=>{try{localStorage.setItem("follo_campaigns_db",JSON.stringify(l))}catch{}};
+const loadLastSession=()=>{try{return localStorage.getItem("follo_last_session")||null}catch{return null}};
+const saveLastSession=k=>{try{localStorage.setItem("follo_last_session",k)}catch{}};
+const clearLastSession=()=>{try{localStorage.removeItem("follo_last_session")}catch{}};
+
+// ══════════════════════════════════════════════
+//  FOLLO LOGO
+// ══════════════════════════════════════════════
+function FOLLOLogo({ size = 120 }) {
+  const glow = size * 0.22;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+      <div style={{
+        width: size, height: size,
+        borderRadius: size * 0.22,
+        boxShadow: [
+          `0 0 ${glow*1.5}px ${glow*0.6}px rgba(30,120,255,0.7)`,
+          `0 0 ${glow*3}px ${glow*1.2}px rgba(10,60,220,0.35)`,
+        ].join(", "),
+        overflow: "hidden",
+        position: "relative",
+      }}>
+        <img src={FOLLO_LOGO} alt="FOLLO" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
+      </div>
+    </div>
+  );
+}
+
+function SmallFLogo({ size = 32 }) {
+  const glow = size * 0.3;
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: size * 0.22,
+      boxShadow: `0 0 ${glow*1.5}px ${glow*0.6}px rgba(30,120,255,0.65)`,
+      flexShrink: 0,
+      overflow: "hidden",
+      position: "relative",
+    }}>
+      <img src={FOLLO_LOGO} alt="FOLLO" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}/>
+    </div>
+  );
+}
+
+
+// ===== strings.jsx =====
+const STRINGS={ar:{dir:"rtl",appName:"FOLLO",tagline:"بادل المتابعات، اربح العملات",useAnotherAccount:"الدخول بحساب آخر",email:"البريد الإلكتروني",password:"كلمة المرور",sendCode:"تسجيل الدخول",loginTab:"تسجيل الدخول",signupTab:"إنشاء حساب",signupNamePlaceholder:"اسمك في التطبيق",confirmPasswordPlaceholder:"تأكيد كلمة المرور",chooseLang:"اختر لغتك",chooseLangSub:"يمكنك تغييرها لاحقاً",continue:"متابعة",onboardTitle1:"اكسب عملات مقابل متابعتك",onboardBody1:"تابع حسابات أعضاء آخرين على انستقرام وأكّد المتابعة لتربح 10 عملات.",onboardTitle2:"روّج لحسابك بسرعتك",onboardBody2:"اختر عدد المتابعين والسرعة التي تناسبك.",onboardTitle3:"حماية عادلة بالشكاوى",onboardBody3:"لو ادّعى أحدهم أنه تابعك ولم يفعل، أبلغ عنه وخذ رصيده.",skip:"تخطي",next:"التالي",start:"ابدأ الآن",followGateTitle:"خطوة أخيرة",followGateBody:"يجب عليك متابعة حساب FOLLO الرسمي على انستقرام للدخول",openInstagram:"فتح حساب انستقرام",confirmFollow:"لقد تابعت الحساب ✓ - ادخل الآن",backToHome:"رجوع",followWarning:"تنبيه: عدم المتابعة يمنعك من استخدام التطبيق.",igHandlePlaceholder:"اسم المستخدم بدون @",igHandleInvalid:"اسم المستخدم غير صالح (1-30 حرف، أرقام وحروف ونقاط و_).",igCheckNote:"ملاحظة: نتحقق من صيغة الاسم فقط حالياً.",navEarn:"كسب",navPromote:"ترويج",navComplaints:"شكاوى",navProfile:"حسابي",navAdmin:"الإدارة",balance:"رصيدك",unlimited:"غير محدود",earnTitle:"كسب العملات",earnSub:"أكّد متابعتك لهذه الحسابات واربح عملات فورية",reward:"+10 عملات",confirmBtn:"تأكيد المتابعة",confirmed:"تم التأكيد ✓",emptyEarn:"لا توجد حملات حالياً. عد لاحقاً!",of:"من",followers:"متابع",promoteTitle:"الترويج لحسابك",promoteSub:"اختر السرعة وعدد المتابعين",speedNormal:"عادية",speedFast:"سريعة",speedUltra:"فائقة السرعة",speedNormalDesc:"كل 100 متابع = 1200 عملة",speedFastDesc:"أولوية أعلى — 2400 عملة",speedUltraDesc:"أعلى القائمة دائماً — 3600 عملة",yourHandle:"اسم حسابك على انستقرام",followerCount:"عدد المتابعين المطلوب",totalCost:"التكلفة الإجمالية",submitPromote:"بدء الترويج",notEnoughCoins:"رصيدك غير كافٍ",promoteSuccess:"تم إطلاق حملتك بنجاح!",complaintsTitle:"الشكاوى",complaintsSub:"راجع من أكّد متابعتك",noOwnCampaign:"لم تنشئ أي حملة بعد",noOwnCampaignBody:"أنشئ حملة من تبويب الترويج أولاً.",legitBtn:"نعم، تابعني",reportBtn:"إبلاغ عنه",verifiedTag:"موثّق ✓",reportedTag:"خُصمت منه 100 عملة",lockedTag:"🔒 محظور نهائياً",reportToast:"تم خصم 100 عملة (المحاولة {n} من 3)",verifyToast:"تم رفع تقييمه",profileTitle:"حسابي",changePhoto:"تغيير الصورة",avatarPresetsTitle:"أو اختر صورة جاهزة",yourStars:"تقييمك",lifetimeCoins:"إجمالي ما ربحته",switchAccount:"إضافة / تبديل حساب",logout:"تسجيل الخروج",accountSettings:"بيانات الحساب",saveChanges:"حفظ التغييرات",savedToast:"تم حفظ التغييرات",newPasswordPlaceholder:"كلمة مرور جديدة (اتركها فارغة لعدم التغيير)",language:"اللغة",adminBadge:"أدمن FOLLO",adminTitle:"لوحة الإدارة",online:"متصل الآن",offline:"غير متصل",role:"الصلاحية",roleMember:"عضو",roleAdmin:"أدمن",giftCoins:"منح",giftAmountPlaceholder:"عدد العملات",giftToast:"تم منح العملات",deleteConfirm:"سيتم حذف حساب {name} نهائياً. متأكد؟",deleteToast:"تم حذف الحساب",autoDeleteToast:"بلغ {name} 3 إنذارات — تم حذف حسابه",memberOnly:"الأعضاء فقط",addMemberTitle:"إضافة عضو جديد",namePlaceholder:"اسم العضو",handlePlaceholder:"اسم حسابه على انستقرام",addBtn:"إضافة",addToast:"تمت الإضافة",noMembers:"لا يوجد أعضاء بعد.",resetData:"إعادة ضبط كل البيانات",resetConfirm:"سيتم حذف كل الحسابات والحملات. متأكد؟"},en:{dir:"ltr",appName:"FOLLO",tagline:"Trade follows, earn coins",useAnotherAccount:"Use another account",email:"Email",password:"Password",sendCode:"Log in",loginTab:"Log in",signupTab:"Sign up",signupNamePlaceholder:"Your name",confirmPasswordPlaceholder:"Confirm password",chooseLang:"Choose language",chooseLangSub:"Change later in profile",continue:"Continue",onboardTitle1:"Earn coins for following",onboardBody1:"Follow members and confirm to earn 10 coins each.",onboardTitle2:"Promote at your speed",onboardBody2:"Choose follower count and speed.",onboardTitle3:"Fair protection",onboardBody3:"Report fake followers and take their coins.",skip:"Skip",next:"Next",start:"Get started",followGateTitle:"One last step",followGateBody:"Follow FOLLO's official Instagram to enter",openInstagram:"Open Instagram",confirmFollow:"I followed ✓ - Enter",backToHome:"Back",followWarning:"Not following = permanently blocked.",igHandlePlaceholder:"Username without @",igHandleInvalid:"Invalid username (1-30 chars, letters/numbers/._).",igCheckNote:"Note: format validation only.",navEarn:"Earn",navPromote:"Promote",navComplaints:"Reports",navProfile:"Profile",navAdmin:"Admin",balance:"Balance",unlimited:"Unlimited",earnTitle:"Earn Coins",earnSub:"Confirm follows for instant coins",reward:"+10 coins",confirmBtn:"Confirm follow",confirmed:"Confirmed ✓",emptyEarn:"No campaigns. Check back!",of:"of",followers:"followers",promoteTitle:"Promote account",promoteSub:"Choose speed and count",speedNormal:"Normal",speedFast:"Fast",speedUltra:"Ultra",speedNormalDesc:"100 followers = 1200 coins",speedFastDesc:"Higher priority — 2400 coins",speedUltraDesc:"Always top — 3600 coins",yourHandle:"Instagram username",followerCount:"Followers needed",totalCost:"Total cost",submitPromote:"Launch",notEnoughCoins:"Not enough coins",promoteSuccess:"Campaign launched!",complaintsTitle:"Reports",complaintsSub:"Review confirmers",noOwnCampaign:"No campaigns yet",noOwnCampaignBody:"Create from Promote tab first.",legitBtn:"Yes, followed",reportBtn:"Report",verifiedTag:"Verified ✓",reportedTag:"100 coins deducted",lockedTag:"🔒 Banned",reportToast:"100 coins deducted (try {n}/3)",verifyToast:"Rating raised",profileTitle:"Profile",changePhoto:"Change photo",avatarPresetsTitle:"Pick avatar",yourStars:"Rating",lifetimeCoins:"Lifetime earned",switchAccount:"Switch account",logout:"Logout",accountSettings:"Account",saveChanges:"Save",savedToast:"Saved",newPasswordPlaceholder:"New password (leave blank to keep)",language:"Language",adminBadge:"FOLLO Admin",adminTitle:"Admin",online:"Online",offline:"Offline",role:"Role",roleMember:"Member",roleAdmin:"Admin",giftCoins:"Gift",giftAmountPlaceholder:"Amount",giftToast:"Gifted",deleteConfirm:"Delete {name}?",deleteToast:"Deleted",autoDeleteToast:"{name} reached 3 — deleted",memberOnly:"Members",addMemberTitle:"Add member",namePlaceholder:"Name",handlePlaceholder:"Instagram",addBtn:"Add",addToast:"Added",noMembers:"No members.",resetData:"Reset data",resetConfirm:"Delete all data?"}};
+["fr","es","tr","de","it","pt","ru","zh","ja","ko","hi","id","nl","pl","sv","uk","fa","ur","bn","ta","th","vi","ms","he","el","cs","ro","hu","da","fi","no"].forEach(l=>{STRINGS[l]=STRINGS.en});
+const ALL_LANGUAGES=[{code:"ar",label:"العربية"},{code:"en",label:"English"},{code:"fr",label:"Français"},{code:"es",label:"Español"},{code:"tr",label:"Türkçe"},{code:"de",label:"Deutsch"},{code:"it",label:"Italiano"},{code:"pt",label:"Português"},{code:"ru",label:"Русский"},{code:"zh",label:"中文"},{code:"ja",label:"日本語"},{code:"ko",label:"한국어"},{code:"hi",label:"हिन्दी"},{code:"id",label:"Indonesia"},{code:"nl",label:"Nederlands"},{code:"pl",label:"Polski"},{code:"sv",label:"Svenska"},{code:"uk",label:"Українська"},{code:"fa",label:"فارسی"},{code:"ur",label:"اردو"},{code:"bn",label:"বাংলা"},{code:"ta",label:"தமிழ்"},{code:"th",label:"ไทย"},{code:"vi",label:"Tiếng Việt"},{code:"ms",label:"Melayu"},{code:"he",label:"עברית"},{code:"el",label:"Ελληνικά"},{code:"cs",label:"Čeština"},{code:"ro",label:"Română"},{code:"hu",label:"Magyar"},{code:"da",label:"Dansk"},{code:"fi",label:"Suomi"},{code:"no",label:"Norsk"}];
+
+
+// ===== screens-auth.jsx =====
+function SplashScreen({ t, onUseAnother }) {
+  return (
+    <Screen dir={t.dir}>
+      <div style={{minHeight:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"radial-gradient(circle at 50% 35%,#16233A 0%,#0A0D14 70%)"}}>
+        <FOLLOLogo size={160}></FOLLOLogo>
+        <div style={{color:"#7C88A6",fontSize:13,marginTop:20,fontFamily:"'JetBrains Mono',monospace"}}>exchange · grow · verify</div>
+        <button onClick={onUseAnother} style={{marginTop:40,background:"none",border:"none",color:"#4B5A7A",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>{t.useAnotherAccount}</button>
+      </div>
+    </Screen>
+  );
+}
+
+function FollowGate({ t, ADMIN_INSTAGRAM, onOpenInstagram, onConfirm, onBack }) {
+  return (
+    <div className="overlay">
+      <FOLLOLogo size={130}></FOLLOLogo>
+      <h2 style={{color:"#fff",fontSize:22,marginBottom:10,marginTop:20,textAlign:"center"}}>{t.followGateTitle}</h2>
+      <p style={{color:"#A9A5B0",textAlign:"center",marginBottom:25,lineHeight:1.7,maxWidth:400}}>{t.followGateBody}<br/><span style={{color:"#38b6ff",fontWeight:"bold",fontSize:17}}>@{ADMIN_INSTAGRAM}</span></p>
+      <button onClick={onOpenInstagram} style={{background:"linear-gradient(135deg,#00d4ff,#1a6fe8)",border:"none",borderRadius:12,padding:"16px 30px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:12,width:"100%",maxWidth:400}}>📷 {t.openInstagram}</button>
+      <button onClick={onConfirm} style={{background:"linear-gradient(135deg,#00E5A0,#7C5CFF)",border:"none",borderRadius:12,padding:"16px 30px",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",marginBottom:12,width:"100%",maxWidth:400}}>{t.confirmFollow}</button>
+      <button onClick={onBack} style={{background:"transparent",border:"1px solid #6E6A78",borderRadius:12,padding:"12px 30px",color:"#A9A5B0",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:20,width:"100%",maxWidth:400}}>← {t.backToHome}</button>
+      <p style={{color:"#FF5C5C",fontSize:12,textAlign:"center",maxWidth:400}}>{t.followWarning}</p>
+    </div>
+  );
+}
+
+function LoginScreen({ t, lang, authMode, setAuthMode, form, setForm, showLoginPassword, setShowLoginPassword, authError, setAuthError, handleLogin, signupName, setSignupName, signupEmail, setSignupEmail, signupPassword, setSignupPassword, signupConfirm, setSignupConfirm, signupInstagram, setSignupInstagram, showSignupPassword, setShowSignupPassword, handleSignup, onReset }) {
+  return (
+    <Screen dir={t.dir}>
+      <div style={{display:"flex",flexDirection:"column",height:"100%",overflowY:"auto"}}>
+        <div style={{textAlign:"center",padding:"44px 28px 24px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+          <FOLLOLogo size={130}></FOLLOLogo>
+          <div style={{marginTop:16,fontSize:13,color:"#7C88A6"}}>{t.tagline}</div>
+        </div>
+
+        <div style={{padding:"0 28px 28px",display:"flex",flexDirection:"column",gap:0}}>
+          <div style={{display:"flex",background:"#121620",border:"1px solid #232838",borderRadius:12,padding:4,marginBottom:22}}>
+            {["login","signup"].map(m=>(
+              <button key={m} onClick={()=>{setAuthMode(m);setAuthError("");}} style={{flex:1,padding:"10px",borderRadius:9,border:"none",cursor:"pointer",background:authMode===m?"linear-gradient(135deg,#00E5A0,#7C5CFF)":"transparent",color:authMode===m?"#0A0D14":"#A9A5B0",fontWeight:700,fontSize:13}}>{m==="login"?t.loginTab:t.signupTab}</button>
+            ))}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {authMode==="login" ? (
+              <>
+                <label style={{position:"relative"}}>
+                  <Mail size={18} color="#6E6A78" style={{position:"absolute",top:16,insetInlineStart:14}}></Mail>
+                  <input value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder={t.email} className="input-field" style={{paddingInlineStart:44}} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+                </label>
+                <label style={{position:"relative"}}>
+                  <Lock size={18} color="#6E6A78" style={{position:"absolute",top:16,insetInlineStart:14}}></Lock>
+                  <input type={showLoginPassword?"text":"password"} value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} placeholder={t.password} className="input-field" style={{paddingInlineStart:44}} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/>
+                  <button type="button" onClick={()=>setShowLoginPassword(v=>!v)} style={{position:"absolute",top:12,insetInlineEnd:12,background:"none",border:"none",cursor:"pointer",padding:4,color:"#6E6A78"}}>{showLoginPassword?<EyeOff size={18}></EyeOff>:<Eye size={18}></Eye>}</button>
+                </label>
+                {authError&&<div style={{color:"#FF5C5C",fontSize:13}}>{authError}</div>}
+                <GradientButton onClick={handleLogin} style={{marginTop:8}}>{t.sendCode}</GradientButton>
+              </>
+            ) : (
+              <>
+                <input value={signupName} onChange={e=>setSignupName(e.target.value)} placeholder={t.signupNamePlaceholder} className="input-field"/>
+                <input value={signupEmail} onChange={e=>setSignupEmail(e.target.value)} placeholder={t.email} type="email" className="input-field"/>
+                <label style={{position:"relative"}}>
+                  <input type={showSignupPassword?"text":"password"} value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} placeholder={t.password} className="input-field"/>
+                  <button type="button" onClick={()=>setShowSignupPassword(v=>!v)} style={{position:"absolute",top:12,insetInlineEnd:12,background:"none",border:"none",cursor:"pointer",padding:4,color:"#6E6A78"}}>{showSignupPassword?<EyeOff size={18}></EyeOff>:<Eye size={18}></Eye>}</button>
+                </label>
+                <input type={showSignupPassword?"text":"password"} value={signupConfirm} onChange={e=>setSignupConfirm(e.target.value)} placeholder={t.confirmPasswordPlaceholder} className="input-field"/>
+                <input value={signupInstagram} onChange={e=>setSignupInstagram(e.target.value)} placeholder={t.igHandlePlaceholder} className="input-field"/>
+                <div style={{background:"rgba(56,182,255,0.08)",border:"1px solid rgba(56,182,255,0.2)",borderRadius:10,padding:"8px 12px",fontSize:11,color:"#A9A5B0",display:"flex",gap:6}}>
+                  <Info size={13} style={{flexShrink:0,marginTop:2}}></Info><span>{t.igCheckNote}</span>
+                </div>
+                {authError&&<div style={{color:"#FF5C5C",fontSize:13}}>{authError}</div>}
+                <GradientButton onClick={handleSignup} style={{marginTop:8}}>{t.signupTab}</GradientButton>
+              </>
+            )}
+          </div>
+
+          <div style={{textAlign:"center",color:"#6E6A78",fontSize:12,paddingTop:24}}>
+            FOLLO © 2026
+            <div><button onClick={onReset} style={{background:"none",border:"none",color:"#7C88A6",fontSize:11,marginTop:10,cursor:"pointer",textDecoration:"underline"}}>{lang==="ar"?"إعادة ضبط البيانات":"Reset data"}</button></div>
+          </div>
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+function OnboardingScreen({ t, onboardIdx, setOnboardIdx, updateUser, setStage }) {
+  const slides=[
+    {icon:<Coins size={30} color="#15121A"></Coins>,title:t.onboardTitle1,body:t.onboardBody1},
+    {icon:<TrendingUp size={30} color="#15121A"></TrendingUp>,title:t.onboardTitle2,body:t.onboardBody2},
+    {icon:<ShieldCheck size={30} color="#15121A"></ShieldCheck>,title:t.onboardTitle3,body:t.onboardBody3},
+  ];
+  const s=slides[onboardIdx];
+  return (
+    <Screen dir={t.dir}>
+      <div style={{padding:"48px 28px 28px",height:"100%",display:"flex",flexDirection:"column"}}>
+        <div style={{textAlign:"end"}}><button onClick={()=>{updateUser({onboarded:true});setStage("app");}} style={{background:"none",border:"none",color:"#6E6A78",fontSize:13,cursor:"pointer"}}>{t.skip}</button></div>
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center"}}>
+          <div style={{width:76,height:76,borderRadius:22,background:"linear-gradient(135deg,#00E5A0,#7C5CFF)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:24}}>{s.icon}</div>
+          <div style={{fontSize:21,fontWeight:700,marginBottom:10,maxWidth:280}}>{s.title}</div>
+          <div style={{color:"#A9A5B0",fontSize:14,lineHeight:1.7,maxWidth:300}}>{s.body}</div>
+        </div>
+        <div style={{display:"flex",justifyContent:"center",gap:6,marginBottom:22}}>
+          {slides.map((_,i)=><div key={i} style={{width:i===onboardIdx?22:7,height:7,borderRadius:4,background:i===onboardIdx?"#00E5A0":"#232838",transition:"all .2s"}}></div>)}
+        </div>
+        <GradientButton onClick={()=>onboardIdx<2?setOnboardIdx(i=>i+1):(updateUser({onboarded:true}),setStage("app"))}>{onboardIdx<2?t.next:t.start}</GradientButton>
+      </div>
+    </Screen>
+  );
+}
+
+
+// ===== screens-tabs.jsx =====
+function ProfileTab({ t,lang,user,updateUser,setLang,editEmail,setEditEmail,editPassword,setEditPassword,showEditPassword,setShowEditPassword,handleSave,showToast,ALL_LANGUAGES,onSwitchAccount,onLogout,onReset }) {
+  return (
+    <div>
+      <div style={{fontSize:19,fontWeight:700,marginBottom:18}}>{t.profileTitle}</div>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:18}}>
+        <label style={{position:"relative",cursor:"pointer"}}>
+          <AvatarView avatar={user.avatar} name={user.name} size={84}></AvatarView>
+          <div style={{position:"absolute",bottom:-2,insetInlineEnd:-2,width:28,height:28,borderRadius:"50%",background:"#1A1F2C",border:"2px solid #0A0D14",display:"flex",alignItems:"center",justifyContent:"center"}}><Camera size={14}></Camera></div>
+          <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>updateUser(u=>({...u,avatar:ev.target.result}));r.readAsDataURL(f);}}/>
+        </label>
+        <div style={{fontWeight:700,fontSize:16,marginTop:12}}>{user.name}</div>
+        <div style={{color:"#6E6A78",fontSize:13}}>{user.email}</div>
+        {user.instagramHandle&&<button onClick={()=>openInstagramProfile(user.instagramHandle)} style={{marginTop:4,background:"none",border:"none",color:"#38b6ff",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}><Instagram size={12}></Instagram>@{user.instagramHandle}</button>}
+        {user.isAdmin&&<div style={{display:"flex",alignItems:"center",gap:4,marginTop:6,background:"rgba(255,201,77,0.12)",padding:"4px 10px",borderRadius:999}}><Crown size={12} color="#FFCB4D"></Crown><span style={{color:"#FFCB4D",fontSize:11,fontWeight:700}}>{t.adminBadge}</span></div>}
+      </div>
+      <div style={{marginBottom:8,fontSize:12,color:"#8B8891"}}>{t.avatarPresetsTitle}</div>
+      <div style={{display:"flex",gap:8,marginBottom:24,overflowX:"auto",paddingBottom:4}}>
+        {AVATAR_PRESETS.map((p,i)=><button key={i} onClick={()=>updateUser(u=>({...u,avatar:`preset:${i}`}))} style={{flexShrink:0,width:50,height:50,borderRadius:"50%",border:user.avatar===`preset:${i}`?"2px solid #00E5A0":"2px solid transparent",padding:0,cursor:"pointer",background:"none"}}><AvatarView avatar={`preset:${i}`} size={46} fontSize={22}></AvatarView></button>)}
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:20}}>
+        <StatCard label={t.yourStars} value={<span style={{display:"flex",alignItems:"center",gap:4}}><Star size={14} color="#FFCB4D"></Star>{user.stars}</span>}/>
+        <StatCard label={t.lifetimeCoins} value={user.isAdmin?"∞":user.lifetimeCoins}></StatCard>
+      </div>
+      <div style={{marginBottom:8,fontSize:12,color:"#8B8891"}}>{t.language}</div>
+      <select value={lang} onChange={e=>setLang(e.target.value)} className="lang-select" style={{marginBottom:20}}>{ALL_LANGUAGES.map(o=><option key={o.code} value={o.code}>{o.label}</option>)}</select>
+      <div style={{marginBottom:8,fontSize:12,color:"#8B8891"}}>{t.accountSettings}</div>
+      <input value={editEmail} onChange={e=>setEditEmail(e.target.value)} placeholder={user.email} style={{width:"100%",background:"#121620",border:"1px solid #232838",borderRadius:12,padding:"10px 14px",color:"#F6F4F2",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+      <label style={{position:"relative",display:"block"}}>
+        <input type={showEditPassword?"text":"password"} value={editPassword} onChange={e=>setEditPassword(e.target.value)} placeholder={t.newPasswordPlaceholder} style={{width:"100%",background:"#121620",border:"1px solid #232838",borderRadius:12,padding:"10px 44px 10px 14px",color:"#F6F4F2",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
+        <button type="button" onClick={()=>setShowEditPassword(v=>!v)} style={{position:"absolute",top:9,insetInlineEnd:12,background:"none",border:"none",cursor:"pointer",padding:4,color:"#6E6A78"}}>{showEditPassword?<EyeOff size={16}></EyeOff>:<Eye size={16}></Eye>}</button>
+      </label>
+      <button onClick={handleSave} style={{width:"100%",padding:"10px",borderRadius:10,border:"1px solid #232838",background:"#121620",color:"#F6F4F2",fontWeight:600,fontSize:13,cursor:"pointer",marginBottom:20}}>{t.saveChanges}</button>
+      <MenuRow icon={<Plus size={18}></Plus>} label={t.switchAccount} onClick={onSwitchAccount}/>
+      <MenuRow icon={<LogOut size={18}></LogOut>} label={t.logout} danger onClick={onLogout}/>
+      <MenuRow icon={<AlertTriangle size={18}></AlertTriangle>} label={t.resetData} danger onClick={onReset}/>
+    </div>
+  );
+}
+
+function AdminTab({ t,lang,members,usersDB,setUsersDB,broadcast,giftAmounts,setGiftAmounts,newMemberName,setNewMemberName,newMemberEmail,setNewMemberEmail,newMemberHandle,setNewMemberHandle,showToast }) {
+  return (
+    <div>
+      <div style={{fontSize:19,fontWeight:700,marginBottom:18}}>{t.adminTitle}</div>
+      <div style={{background:"#121620",border:"1px solid #232838",borderRadius:14,padding:14,marginBottom:20}}>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{t.addMemberTitle}</div>
+        <input value={newMemberName} onChange={e=>setNewMemberName(e.target.value)} placeholder={t.namePlaceholder} style={{width:"100%",background:"#0A0D14",border:"1px solid #232838",borderRadius:10,padding:"10px 14px",color:"#F6F4F2",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+        <input value={newMemberEmail} onChange={e=>setNewMemberEmail(e.target.value)} placeholder={t.email} style={{width:"100%",background:"#0A0D14",border:"1px solid #232838",borderRadius:10,padding:"10px 14px",color:"#F6F4F2",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+        <input value={newMemberHandle} onChange={e=>setNewMemberHandle(e.target.value)} placeholder={t.handlePlaceholder} style={{width:"100%",background:"#0A0D14",border:"1px solid #232838",borderRadius:10,padding:"10px 14px",color:"#F6F4F2",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:10}}/>
+        <GradientButton disabled={!newMemberName.trim()||!newMemberEmail.trim()} onClick={()=>{const h=newMemberHandle.trim().replace("@","");if(h&&!isValidInstagramHandle(h)){showToast(t.igHandleInvalid);return;}const k=newMemberEmail.trim().toLowerCase();setUsersDB(db=>{const n={...db,[k]:{email:newMemberEmail.trim(),password:"",name:newMemberName.trim(),instagramHandle:h,avatar:null,coins:0,lifetimeCoins:0,stars:5,role:"member",strikes:0,online:false,onboarded:true,confirmedCampaigns:[],followedAdmin:false}};broadcast("users",n);return n;});setNewMemberName("");setNewMemberEmail("");setNewMemberHandle("");showToast(t.addToast);}} style={{width:"100%",padding:"10px",fontSize:13}}>{t.addBtn}</GradientButton>
+      </div>
+      {members.length===0&&<EmptyState icon={<Users size={26} color="#6E6A78"></Users>} text={t.noMembers}/>}
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {members.map(m=>(
+          <div key={m.email} style={{background:"#121620",border:"1px solid #232838",borderRadius:14,padding:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{width:32,height:32,borderRadius:"50%",overflow:"hidden",flexShrink:0}}><img src={FOLLO_LOGO} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:13}}>{m.name}{m.strikes>=3&&<span style={{color:"#FF5C5C",marginInlineStart:6,fontSize:11}}>{t.lockedTag}</span>}</div>
+                <div style={{color:"#6E6A78",fontSize:11}}>{m.email}{m.instagramHandle&&` · @${m.instagramHandle}`}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginTop:3}}><CoinPill value={m.coins} small></CoinPill><span style={{display:"flex",alignItems:"center",gap:3,color:"#FFCB4D",fontSize:11}}><Star size={11} color="#FFCB4D"></Star>{m.stars??5}</span>{m.strikes>0&&<span style={{display:"flex",alignItems:"center",gap:3,color:"#FF5C5C",fontSize:11}}><AlertTriangle size={11}></AlertTriangle>{m.strikes}</span>}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <select value={m.role} onChange={e=>setUsersDB(db=>{const n={...db,[m.email.toLowerCase()]:{...db[m.email.toLowerCase()],role:e.target.value}};broadcast("users",n);return n;})} style={{flex:1,background:"#1A1F2C",color:"#F6F4F2",border:"1px solid #33394A",borderRadius:8,fontSize:11,padding:"6px 8px"}}><option value="member">{t.roleMember}</option><option value="admin">{t.roleAdmin}</option></select>
+              <button onClick={()=>{if(window.confirm(t.deleteConfirm.replace("{name}",m.name))){setUsersDB(db=>{const n={...db};delete n[m.email.toLowerCase()];broadcast("users",n);return n;});showToast(t.deleteToast);}}} style={{display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(255,92,92,0.1)",border:"1px solid rgba(255,92,92,0.3)",borderRadius:8,color:"#FF5C5C",padding:"6px 10px",cursor:"pointer"}}><Trash2 size={13}></Trash2></button>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={giftAmounts[m.email]??""} onChange={e=>setGiftAmounts(g=>({...g,[m.email]:e.target.value.replace(/\D/g,"")}))} placeholder={t.giftAmountPlaceholder} style={{flex:1,background:"#1A1F2C",color:"#F6F4F2",border:"1px solid #33394A",borderRadius:8,fontSize:11,padding:"6px 8px"}}/>
+              <button onClick={()=>{const a=parseInt(giftAmounts[m.email],10);if(!a||a<=0)return;setUsersDB(db=>{const n={...db,[m.email.toLowerCase()]:{...db[m.email.toLowerCase()],coins:(db[m.email.toLowerCase()].coins||0)+a}};broadcast("users",n);return n;});setGiftAmounts(g=>({...g,[m.email]:""}));showToast(t.giftToast);}} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(255,201,77,0.12)",border:"1px solid rgba(255,201,77,0.3)",borderRadius:8,color:"#FFCB4D",fontSize:11,fontWeight:600,padding:"6px 10px",cursor:"pointer",whiteSpace:"nowrap"}}><Gift size={12}></Gift>{t.giftCoins}</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+// ===== screens-main.jsx =====
+function MainApp(props) {
+  const { t,lang,user,tab,setTab,setLang,toast,usersDB,setUsersDB,campaigns,members,promoteSpeed,setPromoteSpeed,promoteHandle,setPromoteHandle,promoteCount,setPromoteCount,promoteCost,earnList,myCampaigns,editEmail,setEditEmail,editPassword,setEditPassword,showEditPassword,setShowEditPassword,giftAmounts,setGiftAmounts,newMemberName,setNewMemberName,newMemberEmail,setNewMemberEmail,newMemberHandle,setNewMemberHandle,broadcast,updateUser,confirmFollow,submitPromote,verifyConfirmer,handleSave,showToast,ALL_LANGUAGES,onSwitchAccount,onLogout,onReset } = props;
+
+  const NavBtn = ({id,icon,label}) => (
+    <button onClick={()=>setTab(id)} style={{flex:1,background:"none",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:tab===id?"#00E5A0":"#6E6A78",padding:"10px 0"}}>
+      <div>{icon}</div>
+      <span style={{fontSize:10,fontWeight:600}}>{label}</span>
+    </button>
+  );
+
+  return (
+    <Screen dir={t.dir}>
+      {toast&&<div style={{position:"absolute",top:50,left:16,right:16,zIndex:50,background:"#1A1F2C",border:"1px solid #33394A",borderRadius:12,padding:"10px 14px",fontSize:13,textAlign:"center",boxShadow:"0 10px 24px -8px rgba(0,0,0,0.5)"}}>{toast}</div>}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"50px 18px 10px",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <SmallFLogo size={34}></SmallFLogo>
+          <span style={{fontWeight:800,fontSize:17}}>{t.appName}</span>
+          {user.isAdmin&&<Crown size={16} color="#FFCB4D"></Crown>}
+        </div>
+        <CoinPill value={user.isAdmin?"∞":user.coins}></CoinPill>
+      </div>
+      <div style={{overflow:"hidden",borderTop:"1px solid #1A1F2C",borderBottom:"1px solid #1A1F2C",background:"#0E1119",padding:"6px 0",flexShrink:0}}>
+        <div style={{display:"flex",width:"200%",animation:"follo-ticker 22s linear infinite",fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#7C88A6",whiteSpace:"nowrap"}}>
+          {[0,1].map(i=><div key={i} style={{display:"flex",width:"50%",justifyContent:"space-around"}}><span>🪙 +10 EARNED</span><span>📈 NEW CAMPAIGN</span><span>✅ FOLLOW CONFIRMED</span><span>🚩 REPORT RESOLVED</span><span>⭐ RATING UPDATED</span></div>)}
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"4px 20px 90px"}}>
+        {tab==="earn"&&<EarnTab t={t} earnList={earnList} user={user} confirmFollow={confirmFollow}></EarnTab>}
+        {tab==="promote"&&<PromoteTab t={t} promoteHandle={promoteHandle} setPromoteHandle={setPromoteHandle} promoteSpeed={promoteSpeed} setPromoteSpeed={setPromoteSpeed} promoteCount={promoteCount} setPromoteCount={setPromoteCount} promoteCost={promoteCost} user={user} submitPromote={submitPromote}></PromoteTab>}
+        {tab==="complaints"&&<ComplaintsTab t={t} lang={lang} myCampaigns={myCampaigns} verifyConfirmer={verifyConfirmer}></ComplaintsTab>}
+        {tab==="profile"&&<ProfileTab t={t} lang={lang} user={user} updateUser={updateUser} setLang={setLang} editEmail={editEmail} setEditEmail={setEditEmail} editPassword={editPassword} setEditPassword={setEditPassword} showEditPassword={showEditPassword} setShowEditPassword={setShowEditPassword} handleSave={handleSave} showToast={showToast} ALL_LANGUAGES={ALL_LANGUAGES} onSwitchAccount={onSwitchAccount} onLogout={onLogout} onReset={onReset}></ProfileTab>}
+        {tab==="admin"&&(user.isAdmin||user.role==="admin")&&<AdminTab t={t} lang={lang} members={members} usersDB={usersDB} setUsersDB={setUsersDB} broadcast={broadcast} giftAmounts={giftAmounts} setGiftAmounts={setGiftAmounts} newMemberName={newMemberName} setNewMemberName={setNewMemberName} newMemberEmail={newMemberEmail} setNewMemberEmail={setNewMemberEmail} newMemberHandle={newMemberHandle} setNewMemberHandle={setNewMemberHandle} showToast={showToast}></AdminTab>}
+      </div>
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#0E1119",borderTop:"1px solid #1A1F2C",display:"flex",padding:"4px 8px 20px",zIndex:100}}>
+        <NavBtn id="earn" icon={<Coins size={19}></Coins>} label={t.navEarn}/>
+        <NavBtn id="promote" icon={<TrendingUp size={19}></TrendingUp>} label={t.navPromote}/>
+        <NavBtn id="complaints" icon={<Flag size={19}></Flag>} label={t.navComplaints}/>
+        <NavBtn id="profile" icon={<User size={19}></User>} label={t.navProfile}/>
+        {(user.isAdmin||user.role==="admin")&&<NavBtn id="admin" icon={<Settings size={19}></Settings>} label={t.navAdmin}/>}
+      </div>
+    </Screen>
+  );
+}
+
+function EarnTab({ t, earnList, user, confirmFollow }) {
+  return (
+    <div>
+      <div style={{fontSize:19,fontWeight:700,marginBottom:2}}>{t.earnTitle}</div>
+      <div style={{color:"#A9A5B0",fontSize:13,marginBottom:18}}>{t.earnSub}</div>
+      {earnList.length===0&&<EmptyState icon={<Users size={26} color="#6E6A78"></Users>} text={t.emptyEarn}/>}
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {earnList.map(c=>{
+          const done=user.confirmedCampaigns.includes(c.id);
+          return (
+            <div key={c.id} style={{background:"#121620",border:"1px solid #232838",borderRadius:16,padding:16}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                <div style={{width:40,height:40,borderRadius:"50%",overflow:"hidden",flexShrink:0}}><img src={FOLLO_LOGO} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:14}}>@{c.handle}</div><div style={{color:"#6E6A78",fontSize:12}}>{c.confirmers.length} {t.of} {c.target} {t.followers}</div></div>
+                <Bolts n={SPEED_META[c.speed].bolts}></Bolts>
+              </div>
+              <div style={{height:5,background:"#1A1F2C",borderRadius:4,overflow:"hidden",marginBottom:12}}>
+                <div style={{height:"100%",width:`${Math.min(100,(c.confirmers.length/c.target)*100)}%`,background:"linear-gradient(90deg,#00E5A0,#7C5CFF)"}}></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>window.open(`https://instagram.com/${c.handle}`,"_blank")} style={{flex:1,padding:"10px",borderRadius:10,border:"1px solid #33394A",background:"transparent",color:"#F6F4F2",fontSize:13,fontWeight:600,display:"flex",alignItems:"center",justifyContent:"center",gap:6,cursor:"pointer"}}><Instagram size={14}></Instagram>{t.openInstagram}</button>
+                <GradientButton onClick={()=>confirmFollow(c.id)} disabled={done} style={{flex:1,padding:"10px",fontSize:13}}>{done?t.confirmed:`${t.confirmBtn} ${t.reward}`}</GradientButton>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PromoteTab({ t, promoteHandle, setPromoteHandle, promoteSpeed, setPromoteSpeed, promoteCount, setPromoteCount, promoteCost, user, submitPromote }) {
+  return (
+    <div>
+      <div style={{fontSize:19,fontWeight:700,marginBottom:2}}>{t.promoteTitle}</div>
+      <div style={{color:"#A9A5B0",fontSize:13,marginBottom:18}}>{t.promoteSub}</div>
+      <input value={promoteHandle} onChange={e=>setPromoteHandle(e.target.value)} placeholder={t.yourHandle} style={{width:"100%",background:"#121620",border:"1px solid #232838",borderRadius:12,padding:"14px",color:"#F6F4F2",fontSize:14,outline:"none",boxSizing:"border-box",marginBottom:16}}/>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:18}}>
+        {["normal","fast","ultra"].map(sp=>(
+          <button key={sp} onClick={()=>setPromoteSpeed(sp)} style={{textAlign:"start",padding:"14px 16px",borderRadius:14,border:promoteSpeed===sp?"2px solid #00E5A0":"1px solid #232838",background:promoteSpeed===sp?"rgba(0,229,160,0.08)":"#121620",cursor:"pointer",color:"#F6F4F2"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}><span style={{fontWeight:700,fontSize:14}}>{t[`speed${sp[0].toUpperCase()}${sp.slice(1)}`]}</span><Bolts n={SPEED_META[sp].bolts}></Bolts></div>
+            <div style={{color:"#8B8891",fontSize:12}}>{t[`speed${sp[0].toUpperCase()}${sp.slice(1)}Desc`]}</div>
+          </button>
+        ))}
+      </div>
+      <div style={{marginBottom:8,fontSize:13,color:"#A9A5B0"}}>{t.followerCount}</div>
+      <div style={{display:"flex",gap:8,marginBottom:18}}>
+        {[100,200,300].map(n=><button key={n} onClick={()=>setPromoteCount(n)} style={{flex:1,padding:"12px",borderRadius:12,border:promoteCount===n?"2px solid #7C5CFF":"1px solid #232838",background:promoteCount===n?"rgba(124,92,255,0.1)":"#121620",color:"#F6F4F2",fontWeight:700,cursor:"pointer"}}>{n}</button>)}
+      </div>
+      <div style={{background:"#121620",border:"1px solid #232838",borderRadius:14,padding:16,marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{color:"#A9A5B0",fontSize:13}}>{t.totalCost}</span><CoinPill value={user.isAdmin?t.unlimited:promoteCost} small></CoinPill></div>
+      <GradientButton onClick={submitPromote} disabled={!promoteHandle.trim()} style={{width:"100%"}}>{t.submitPromote}</GradientButton>
+    </div>
+  );
+}
+
+function ComplaintsTab({ t, lang, myCampaigns, verifyConfirmer }) {
+  return (
+    <div>
+      <div style={{fontSize:19,fontWeight:700,marginBottom:2}}>{t.complaintsTitle}</div>
+      <div style={{color:"#A9A5B0",fontSize:13,marginBottom:18}}>{t.complaintsSub}</div>
+      {myCampaigns.length===0&&<EmptyState icon={<Flag size={26} color="#6E6A78"></Flag>} text={t.noOwnCampaign} sub={t.noOwnCampaignBody}/>}
+      {myCampaigns.map(c=>(
+        <div key={c.id} style={{marginBottom:18}}>
+          <div style={{fontSize:13,color:"#8B8891",marginBottom:8}}>@{c.handle} · {c.confirmers.length} {t.of} {c.target}</div>
+          {c.confirmers.length===0&&<div style={{color:"#6E6A78",fontSize:13,padding:"12px 0"}}>—</div>}
+          {c.confirmers.map(cf=>(
+            <div key={cf.id} style={{background:"#121620",border:"1px solid #232838",borderRadius:14,padding:14,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:cf.status==="pending"?12:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:34,height:34,borderRadius:"50%",overflow:"hidden",flexShrink:0}}><img src={FOLLO_LOGO} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>
+                  <div>
+                    <button onClick={()=>cf.instagramHandle&&openInstagramProfile(cf.instagramHandle)} style={{background:"none",border:"none",padding:0,cursor:cf.instagramHandle?"pointer":"default",color:"#F6F4F2",fontWeight:700,fontSize:14,display:"flex",alignItems:"center",gap:4}}>{cf.instagramHandle?`@${cf.instagramHandle}`:(lang==="ar"?"بلا حساب":"No IG")}{cf.instagramHandle&&<Instagram size={12} color="#38b6ff"></Instagram>}</button>
+                    <div style={{color:"#6E6A78",fontSize:11}}>{cf.name}</div>
+                  </div>
+                </div>
+                {cf.status==="verified"&&<span style={{color:"#33D17A",fontSize:12,fontWeight:600}}>{t.verifiedTag}</span>}
+                {cf.status==="reported"&&<span style={{color:"#FF5C5C",fontSize:12,fontWeight:600}}>{t.reportedTag}</span>}
+              </div>
+              {cf.status==="pending"&&<div style={{display:"flex",gap:8}}><button onClick={()=>verifyConfirmer(c.id,cf.id,true)} style={{flex:1,padding:"9px",borderRadius:10,border:"1px solid #33D17A55",background:"rgba(51,209,122,0.1)",color:"#33D17A",fontWeight:600,fontSize:12,cursor:"pointer"}}>{t.legitBtn}</button><button onClick={()=>verifyConfirmer(c.id,cf.id,false)} style={{flex:1,padding:"9px",borderRadius:10,border:"1px solid #FF5C5C55",background:"rgba(255,92,92,0.1)",color:"#FF5C5C",fontWeight:600,fontSize:12,cursor:"pointer"}}>{t.reportBtn}</button></div>}
+            </div>
+          ))}
+        </div>
+      ))}
+      <div style={{textAlign:"center",marginTop:30,marginBottom:20}}><SmallFLogo size={50}></SmallFLogo></div>
+    </div>
+  );
+}
+
+
+// ===== App.jsx =====
+function App() {
+  const [stage, setStage] = useState("splash");
+  const [lang, setLang] = useState("ar");
+  const t = STRINGS[lang] || STRINGS.en;
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
+  const [signupInstagram, setSignupInstagram] = useState("");
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [onboardIdx, setOnboardIdx] = useState(0);
+  const [user, setUser] = useState(null);
+  const [tab, setTab] = useState("earn");
+  const [usersDB, setUsersDB] = useState(() => loadUsersDB());
+  const [campaigns, setCampaigns] = useState(() => loadCampaignsDB());
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberHandle, setNewMemberHandle] = useState("");
+  const [giftAmounts, setGiftAmounts] = useState({});
+  const [editEmail, setEditEmail] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [toast, setToast] = useState("");
+  const [promoteSpeed, setPromoteSpeed] = useState("normal");
+  const [promoteHandle, setPromoteHandle] = useState("");
+  const [promoteCount, setPromoteCount] = useState(100);
+  const promoteCost = Math.round(SPEED_META[promoteSpeed].cost * (promoteCount / 100));
+
+  const members = (() => {
+    const map = new Map();
+    Object.values(usersDB).forEach(m => {
+      if (!m.email) return;
+      const k = m.email.toLowerCase();
+      if (k === user?.email?.toLowerCase()) return;
+      if (!map.has(k)) map.set(k, m);
+    });
+    return Array.from(map.values());
+  })();
+
+  const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(""), 2400); }, []);
+
+  useEffect(() => { saveUsersDB(usersDB); }, [usersDB]);
+  useEffect(() => { saveCampaignsDB(campaigns); }, [campaigns]);
+
+  const bcRef = useRef(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel !== "undefined") {
+      bcRef.current = new BroadcastChannel("follo_sync");
+      bcRef.current.onmessage = ({ data: { type, data } }) => {
+        if (type === "users") setUsersDB(data);
+        else if (type === "campaigns") setCampaigns(data);
+      };
+      return () => bcRef.current?.close();
+    }
+  }, []);
+
+  const broadcast = useCallback((type, data) => { bcRef.current?.postMessage({ type, data }); }, []);
+
+  const updateUser = useCallback((patch) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = typeof patch === "function" ? patch(prev) : { ...prev, ...patch };
+      setUsersDB(db => { const n = { ...db, [next.email.toLowerCase()]: next }; broadcast("users", n); return n; });
+      return next;
+    });
+  }, [broadcast]);
+
+  const handleLogin = () => {
+    const emailKey = form.email.trim().toLowerCase();
+    if (!emailKey.includes("@") || form.password.length < 4) { setAuthError(lang === "ar" ? "أدخل بريداً صحيحاً وكلمة مرور 4 أحرف فأكثر" : "Enter valid email + password (4+ chars)"); return; }
+    const isAdmin = emailKey === ADMIN_EMAIL && form.password === ADMIN_PASSWORD;
+    const existing = usersDB[emailKey];
+    if (!existing && !isAdmin) { setAuthError(lang === "ar" ? "لا يوجد حساب بهذا البريد." : "No account with this email."); return; }
+    if (existing && !isAdmin && existing.password && form.password !== existing.password) { setAuthError(lang === "ar" ? "كلمة المرور غير صحيحة" : "Wrong password"); return; }
+    const merged = existing
+      ? { ...existing, isAdmin, role: isAdmin ? "admin" : existing.role, coins: isAdmin ? Infinity : existing.coins, lifetimeCoins: isAdmin ? Infinity : existing.lifetimeCoins, online: true, followedAdmin: isAdmin ? true : existing.followedAdmin }
+      : { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, name: "FOLLO Admin", avatar: null, coins: Infinity, lifetimeCoins: Infinity, stars: 5, isAdmin: true, role: "admin", instagramHandle: ADMIN_INSTAGRAM, strikes: 0, online: true, followedAdmin: true, onboarded: true, confirmedCampaigns: [] };
+    setUser(merged);
+    setUsersDB(db => { const n = { ...db, [emailKey]: merged }; broadcast("users", n); return n; });
+    saveLastSession(emailKey);
+    setAuthError("");
+    if (!merged.followedAdmin) { setStage("followGate"); return; }
+    setStage(merged.onboarded ? "app" : "onboarding");
+  };
+
+  const handleSignup = () => {
+    if (!signupName.trim()) { setAuthError(lang === "ar" ? "أدخل اسمك" : "Enter your name"); return; }
+    if (!signupEmail.includes("@")) { setAuthError(lang === "ar" ? "بريد غير صحيح" : "Invalid email"); return; }
+    if (signupPassword.length < 4) { setAuthError(lang === "ar" ? "كلمة المرور 4 أحرف فأكثر" : "Password 4+ chars"); return; }
+    if (signupPassword !== signupConfirm) { setAuthError(lang === "ar" ? "كلمتا المرور غير متطابقتين" : "Passwords don't match"); return; }
+    const emailKey = signupEmail.trim().toLowerCase();
+    const isAdmin = emailKey === ADMIN_EMAIL && signupPassword === ADMIN_PASSWORD;
+    const igHandle = signupInstagram.replace("@", "").trim();
+    if (!isAdmin) { if (!igHandle) { setAuthError(lang === "ar" ? "أدخل حسابك على انستقرام" : "Enter Instagram handle"); return; } if (!isValidInstagramHandle(igHandle)) { setAuthError(t.igHandleInvalid); return; } }
+    if (usersDB[emailKey]) { setAuthError(lang === "ar" ? "هذا البريد مستخدم من قبل." : "Email already used."); return; }
+    const fresh = { email: signupEmail.trim(), password: signupPassword, name: signupName.trim(), avatar: null, coins: isAdmin ? Infinity : 250, lifetimeCoins: isAdmin ? Infinity : 250, stars: 5, isAdmin, role: isAdmin ? "admin" : "member", instagramHandle: isAdmin ? ADMIN_INSTAGRAM : igHandle, strikes: 0, online: true, followedAdmin: isAdmin, onboarded: isAdmin, confirmedCampaigns: [] };
+    setUser(fresh);
+    setUsersDB(db => { const n = { ...db, [emailKey]: fresh }; broadcast("users", n); return n; });
+    saveLastSession(emailKey);
+    setAuthError("");
+    setStage("followGate");
+  };
+
+  const confirmFollow = (campaignId) => {
+    const c = campaigns.find(c => c.id === campaignId);
+    if (!c || c.confirmers.length >= c.target) return;
+    const hk = c.handle.toLowerCase();
+    if (user.confirmedHandles?.includes(hk)) return;
+    updateUser(u => { if (u.confirmedCampaigns.includes(campaignId)) return u; return { ...u, coins: u.coins + 10, lifetimeCoins: u.lifetimeCoins + 10, confirmedCampaigns: [...u.confirmedCampaigns, campaignId], confirmedHandles: [...(u.confirmedHandles || []), hk] }; });
+    setCampaigns(cs => { const n = cs.map(c => c.id === campaignId ? { ...c, confirmers: [...c.confirmers, { id: user.email, name: user.name, instagramHandle: user.instagramHandle, status: "pending" }] } : c); broadcast("campaigns", n); return n; });
+    showToast(lang === "ar" ? "+10 عملات! تم تأكيد المتابعة" : "+10 coins! Follow confirmed");
+  };
+
+  const submitPromote = () => {
+    if (!promoteHandle.trim() || !isValidInstagramHandle(promoteHandle)) { showToast(t.igHandleInvalid); return; }
+    if (!user.isAdmin && user.coins < promoteCost) { showToast(t.notEnoughCoins); return; }
+    updateUser(u => ({ ...u, coins: u.isAdmin ? u.coins : u.coins - promoteCost }));
+    const nc = { id: "u" + Date.now(), ownerName: user.name, ownerInitial: user.name[0]?.toUpperCase(), handle: promoteHandle.replace("@", ""), speed: promoteSpeed, target: promoteCount, confirmers: [], createdAt: Date.now() };
+    setCampaigns(cs => { const n = [nc, ...cs]; broadcast("campaigns", n); return n; });
+    setPromoteHandle("");
+    showToast(t.promoteSuccess);
+    setTab("earn");
+  };
+
+  const verifyConfirmer = (campaignId, confId, verified) => {
+    setCampaigns(cs => { const n = cs.map(c => c.id !== campaignId ? c : { ...c, confirmers: c.confirmers.map(cf => cf.id === confId ? { ...cf, status: verified ? "verified" : "reported" } : cf) }); broadcast("campaigns", n); return n; });
+    const k = confId.toLowerCase(), rec = usersDB[k];
+    if (!rec) { showToast(verified ? t.verifyToast : t.reportToast.replace("{n}", "?")); return; }
+    if (verified) { setUsersDB(db => { const n = { ...db, [k]: { ...db[k], stars: (db[k].stars || 0) + 1 } }; broadcast("users", n); return n; }); showToast(t.verifyToast); }
+    else {
+      const strikes = (rec.strikes || 0) + 1;
+      if (strikes >= 3) { setUsersDB(db => { const n = { ...db }; delete n[k]; broadcast("users", n); return n; }); showToast(t.autoDeleteToast.replace("{name}", rec.name)); }
+      else { setUsersDB(db => { const n = { ...db, [k]: { ...db[k], coins: Math.max(0, (db[k].coins || 0) - 100), strikes } }; broadcast("users", n); return n; }); showToast(t.reportToast.replace("{n}", strikes)); }
+    }
+  };
+
+  const handleSave = () => {
+    const ne = editEmail.trim() || user.email;
+    const np = editPassword || user.password;
+    const ok = user.email.toLowerCase(), nk = ne.toLowerCase();
+    const updated = { ...user, email: ne, password: np };
+    setUsersDB(db => { const n = { ...db }; if (ok !== nk) delete n[ok]; n[nk] = updated; broadcast("users", n); return n; });
+    setUser(updated); saveLastSession(nk);
+    setEditEmail(""); setEditPassword("");
+    showToast(t.savedToast);
+  };
+
+  const onSwitchAccount = () => { updateUser({ online: false }); clearLastSession(); setStage("login"); setUser(null); setForm({ email: "", password: "" }); };
+  const onLogout = onSwitchAccount;
+  const onReset = () => { if (window.confirm(t.resetConfirm)) { ["follo_users_db","follo_campaigns_db","follo_last_session"].forEach(k => { try { localStorage.removeItem(k); } catch {} }); window.location.reload(); } };
+
+  const speedRank = { ultra: 3, fast: 2, normal: 1 };
+  const earnList = campaigns.filter(c => c.ownerName !== user?.name && c.confirmers.length < c.target && !user?.confirmedHandles?.includes(c.handle.toLowerCase())).sort((a, b) => speedRank[b.speed] - speedRank[a.speed] || b.createdAt - a.createdAt);
+  const myCampaigns = campaigns.filter(c => c.ownerName === user?.name);
+
+  // Auto-login from saved session
+  useEffect(() => {
+    if (stage !== "splash") return;
+    const timer = setTimeout(() => {
+      const lk = loadLastSession();
+      const saved = lk ? usersDB[lk] : null;
+      if (saved) {
+        const isAdm = lk === ADMIN_EMAIL && saved.role === "admin";
+        const restored = { ...saved, isAdmin: isAdm, coins: isAdm ? Infinity : saved.coins, lifetimeCoins: isAdm ? Infinity : saved.lifetimeCoins };
+        setUser(restored);
+        if (!restored.followedAdmin) { setStage("followGate"); return; }
+        setStage(restored.onboarded ? "app" : "onboarding");
+      } else setStage("login");
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, [stage]);
+
+  if (stage === "splash") return <SplashScreen t={t} onUseAnother={() => setStage("login")}/>;
+  if (stage === "followGate") return (
+    <FollowGate t={t} ADMIN_INSTAGRAM={ADMIN_INSTAGRAM}
+      onOpenInstagram={() => { window.open(`https://instagram.com/${ADMIN_INSTAGRAM}`, "_blank"); }}
+      onConfirm={() => { updateUser({ followedAdmin: true }); setStage(user.onboarded ? "app" : "onboarding"); }}
+      onBack={() => { clearLastSession(); setUser(null); setStage("login"); setForm({ email: "", password: "" }); }}
+    />
+  );
+  if (stage === "login") return (
+    <LoginScreen t={t} lang={lang} authMode={authMode} setAuthMode={setAuthMode} form={form} setForm={setForm}
+      showLoginPassword={showLoginPassword} setShowLoginPassword={setShowLoginPassword}
+      authError={authError} setAuthError={setAuthError} handleLogin={handleLogin}
+      signupName={signupName} setSignupName={setSignupName} signupEmail={signupEmail} setSignupEmail={setSignupEmail}
+      signupPassword={signupPassword} setSignupPassword={setSignupPassword} signupConfirm={signupConfirm} setSignupConfirm={setSignupConfirm}
+      signupInstagram={signupInstagram} setSignupInstagram={setSignupInstagram}
+      showSignupPassword={showSignupPassword} setShowSignupPassword={setShowSignupPassword}
+      handleSignup={handleSignup}
+      onReset={() => { ["follo_users_db","follo_campaigns_db","follo_last_session"].forEach(k => { try { localStorage.removeItem(k); } catch {} }); window.location.reload(); }}
+    />
+  );
+  if (stage === "onboarding") return <OnboardingScreen t={t} onboardIdx={onboardIdx} setOnboardIdx={setOnboardIdx} updateUser={updateUser} setStage={setStage}></OnboardingScreen>;
+  if (stage === "app" && user) return (
+    <MainApp t={t} lang={lang} user={user} tab={tab} setTab={setTab} setLang={setLang} toast={toast}
+      usersDB={usersDB} setUsersDB={setUsersDB} campaigns={campaigns}
+      members={members} promoteSpeed={promoteSpeed} setPromoteSpeed={setPromoteSpeed}
+      promoteHandle={promoteHandle} setPromoteHandle={setPromoteHandle}
+      promoteCount={promoteCount} setPromoteCount={setPromoteCount} promoteCost={promoteCost}
+      earnList={earnList} myCampaigns={myCampaigns}
+      editEmail={editEmail} setEditEmail={setEditEmail}
+      editPassword={editPassword} setEditPassword={setEditPassword}
+      showEditPassword={showEditPassword} setShowEditPassword={setShowEditPassword}
+      giftAmounts={giftAmounts} setGiftAmounts={setGiftAmounts}
+      newMemberName={newMemberName} setNewMemberName={setNewMemberName}
+      newMemberEmail={newMemberEmail} setNewMemberEmail={setNewMemberEmail}
+      newMemberHandle={newMemberHandle} setNewMemberHandle={setNewMemberHandle}
+      broadcast={broadcast} updateUser={updateUser}
+      confirmFollow={confirmFollow} submitPromote={submitPromote} verifyConfirmer={verifyConfirmer}
+      handleSave={handleSave} showToast={showToast} ALL_LANGUAGES={ALL_LANGUAGES}
+      onSwitchAccount={onSwitchAccount} onLogout={onLogout} onReset={onReset}
+    ></MainApp>
+  );
+  return null;
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<StrictMode><App ></App></StrictMode>);
+</script>
+</body>
+</html>
